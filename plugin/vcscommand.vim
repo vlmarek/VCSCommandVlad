@@ -1232,6 +1232,11 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 		let allowNonZeroExit = a:options.allowNonZeroExit
 	endif
 
+	let allowEmptyOutput = 0
+	if has_key(a:options, 'allowEmptyOutput')
+		let allowEmptyOutput = a:options.allowEmptyOutput
+	endif
+
 	let originalBuffer = VCSCommandGetOriginalBuffer(bufnr('%'))
 	if originalBuffer == -1
 		throw 'Original buffer no longer exists, aborting.'
@@ -1277,7 +1282,7 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 		endif
 	endif
 
-	if strlen(output) == 0
+	if strlen(output) == 0 && !allowEmptyOutput
 		" Handle case of no output.  In this case, it is important to check the
 		" file status, especially since cvs edit/unedit may change the attributes
 		" of the file with no visible output.

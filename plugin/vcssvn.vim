@@ -254,7 +254,7 @@ function! s:svnFunctions.Review(argList)
 		let versionOption = ' -r ' . versiontag . ' '
 	endif
 
-	return s:DoCommand('cat --non-interactive' . versionOption, 'review', versiontag, {})
+	return s:DoCommand('cat --non-interactive' . versionOption, 'review', versiontag, {'allowEmptyOutput': 1})
 endfunction
 
 " Function: s:svnFunctions.Status(argList) {{{2
