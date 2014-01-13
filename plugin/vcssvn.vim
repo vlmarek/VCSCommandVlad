@@ -93,12 +93,17 @@ endfunction
 function! s:svnFunctions.Identify(buffer)
 	let oldCwd = VCSCommandChangeToCurrentFileDir(resolve(bufname(a:buffer)))
 	try
-		call s:VCSCommandUtility.system(s:Executable() . ' info .')
+		let root = s:VCSCommandUtility.system(s:Executable() . ' info .')
 		if(v:shell_error)
 			return 0
-		else
+		endif
+		if ! match(root, 'Working Copy Root Path: ')
+			" Maybe old svn does not display repository root?
 			return 1
 		endif
+		let root = substitute(root, '\v.*Working Copy Root Path: ', '', '')
+		let root = substitute(root, '\v[\n\r].*', '', '')
+		return 1 + len(getcwd()) - len(root)
 	finally
 		call VCSCommandChdir(oldCwd)
 	endtry
