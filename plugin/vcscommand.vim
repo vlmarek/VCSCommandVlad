@@ -346,9 +346,6 @@ silent do VCSCommand User VCSPluginInit
 
 " Section: Constants declaration {{{1
 
-let g:VCSCOMMAND_IDENTIFY_EXACT = 1
-let g:VCSCOMMAND_IDENTIFY_INEXACT = -1
-
 " Section: Script variable initialization {{{1
 
 " Hidden functions for use by extensions
@@ -570,7 +567,7 @@ endfunction
 
 " Function:  s:IdentifyVCSType() {{{2
 " This function implements the non-cached identification strategy for
-" VcsCommandGetVCSType().
+" VCSCommandGetVCSType().
 "
 " Returns:  VCS type name identified for the given buffer; an exception is
 " thrown in case no type can be identified.
@@ -585,44 +582,39 @@ function!  s:IdentifyVCSType(buffer)
 		endfor
 	endif
 	let matches = []
-	let exactMatch = ''
-	let exactMatchCount = 0
+	let bestLevel = 0
 	for vcsType in keys(s:plugins)
-		let identified = s:plugins[vcsType][1].Identify(a:buffer)
-		if identified
-			if identified == g:VCSCOMMAND_IDENTIFY_EXACT
-				let exactMatch = vcsType
-				let exactMatchCount += 1
+		let level = s:plugins[vcsType][1].Identify(a:buffer)
+		if level > 0
+			if level < bestLevel
+				let matches = [ vcsType ] + matches
+				let bestLevel = level
+			else
+				let matches += [ vcsType ]
 			endif
-			call add(matches, [vcsType, identified])
 		endif
 	endfor
 	if len(matches) == 1
-		return matches[0][0]
+		return matches[0]
 	elseif len(matches) == 0
 		throw 'No suitable plugin'
 	else
 		let preferences = VCSCommandGetOption("VCSCommandVCSTypePreference", [])
 		if len(preferences) > 0
-			if type(preferences) == 1
+			if type(preferences) == 1 " Turn the variable from string to list
 				let listPreferences = split(preferences, '\W\+')
 				unlet preferences
 				let preferences = listPreferences
 			endif
 			for preferred in preferences
-				for [vcsType, identified] in matches
+				for vcsType in matches
 					if vcsType ==? preferred
 						return vcsType
 					endif
 				endfor
 			endfor
 		endif
-
-		if exactMatchCount == 1
-			return exactMatch
-		endif
-
-		throw 'can''t identify VCS type for current buffer due to too many matching VCS:  ' . join(map(matches, 'v:val[0]'))
+		throw 'can''t identify VCS type for current buffer due to too many matching VCS: ' . join(map(matches, 'v:val'))
 	endif
 endfunction
 
@@ -1160,6 +1152,24 @@ function! VCSCommandChangeToCurrentFileDir(fileName)
 		call VCSCommandChdir(newCwd)
 	endif
 	return oldCwd
+endfunction
+
+" Function: VCSCommandIdentifyFromRoot() {{{2
+" Run command in buffer's directory, return output as root directory.
+
+function! VCSCommandIdentifyFromRoot(buffer, command)
+	let oldCwd = VCSCommandChangeToCurrentFileDir(resolve(bufname(a:buffer)))
+	try
+		let root = s:VCSCommandUtility.system(a:command)
+		if(v:shell_error)
+			return 0
+		else
+			let root = substitute(root, '\n$', '', '')
+			return 1 + len(getcwd()) - len(root)
+		endif
+	finally
+		call VCSCommandChdir(oldCwd)
+	endtry
 endfunction
 
 " Function: VCSCommandGetOriginalBuffer(vcsBuffer) {{{2
