@@ -582,40 +582,46 @@ function!  s:IdentifyVCSType(buffer)
 		endfor
 	endif
 	let matches = []
-	let bestLevel = 0
+	let bestLevel = 99999
 	for vcsType in keys(s:plugins)
 		let level = s:plugins[vcsType][1].Identify(a:buffer)
 		if level > 0
-			if level < bestLevel || empty(matches)
-				let matches = [ vcsType ] + matches
-				let bestLevel = level
-			else
-				let matches += [ vcsType ]
-			endif
+			let matches += [ [ vcsType, level ] ]
+			let bestLevel = min( [bestLevel, level] )
 		endif
 	endfor
+
 	if len(matches) == 1
-		return matches[0]
+		return matches[0][0]
 	elseif len(matches) == 0
 		throw 'No suitable plugin'
-	else
-		let preferences = VCSCommandGetOption("VCSCommandVCSTypePreference", [])
-		if len(preferences) > 0
-			if type(preferences) == 1 " Turn the variable from string to list
-				let listPreferences = split(preferences, '\W\+')
-				unlet preferences
-				let preferences = listPreferences
-			endif
-			for preferred in preferences
-				for vcsType in matches
-					if vcsType ==? preferred
-						return vcsType
-					endif
-				endfor
-			endfor
-		endif
-		throw 'can''t identify VCS type for current buffer due to too many matching VCS: ' . join(map(matches, 'v:val'))
 	endif
+
+	let preferences = VCSCommandGetOption("VCSCommandVCSTypePreference", [])
+	if type(preferences) == 1 " Change the variable from string to list
+		let listPreferences = split(preferences, '\W\+')
+		unlet preferences
+		let preferences = listPreferences
+	endif
+
+	if len(preferences) != 0
+		" Try to find match between preferences and detected VCS
+		for preferred in preferences
+			for [ vcsType, level ] in matches
+				if vcsType ==? preferred
+					return vcsType
+				endif
+			endfor
+		endfor
+	endif
+
+	for [ vcsType, level ] in matches
+		if level == bestLevel
+			return vcsType
+		endif
+	endfor
+
+	throw 'IdentifyVCSType: internal error; matches:'.join(matches, ' ')
 endfunction
 
 " Function: s:SetupScratchBuffer(command, vcsType, originalBuffer, statusText) {{{2
