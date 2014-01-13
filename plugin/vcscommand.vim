@@ -586,7 +586,7 @@ function!  s:IdentifyVCSType(buffer)
 	for vcsType in keys(s:plugins)
 		let level = s:plugins[vcsType][1].Identify(a:buffer)
 		if level > 0
-			if level < bestLevel
+			if level < bestLevel || empty(matches)
 				let matches = [ vcsType ] + matches
 				let bestLevel = level
 			else
