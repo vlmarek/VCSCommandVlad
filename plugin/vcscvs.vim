@@ -350,7 +350,7 @@ function! s:cvsFunctions.Review(argList)
 		let versionOption = ' -r ' . versiontag . ' '
 	endif
 
-	return s:DoCommand('-q update -p' . versionOption, 'review', versiontag, {})
+	return s:DoCommand('-q update -p' . versionOption, 'review', versiontag, {'allowEmptyOutput': 1})
 endfunction
 
 " Function: s:cvsFunctions.Status(argList) {{{2

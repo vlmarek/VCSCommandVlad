@@ -84,19 +84,7 @@ endfunction
 
 " Function: s:bzrFunctions.Identify(buffer) {{{2
 function! s:bzrFunctions.Identify(buffer)
-  let fileName = resolve(bufname(a:buffer))
-  let l:save_bzr_log=$BZR_LOG
-  try
-    let $BZR_LOG=has("win32") || has("win95") || has("win64") || has("win16") ? "nul" : "/dev/null"
-    let statusText = s:VCSCommandUtility.system(s:Executable() . ' info -- "' . fileName . '"')
-  finally
-    let $BZR_LOG=l:save_bzr_log
-  endtry
-  if(v:shell_error)
-    return 0
-  else
-    return 1
-  endif
+  return VCSCommandIdentifyFromRoot(a:buffer, s:Executable() . ' root')
 endfunction
 
 " Function: s:bzrFunctions.Add() {{{2
@@ -234,7 +222,7 @@ function! s:bzrFunctions.Review(argList)
     let versionOption = ' -r ' . versiontag . ' '
   endif
 
-  return s:DoCommand('cat' . versionOption, 'review', versiontag, {})
+  return s:DoCommand('cat' . versionOption, 'review', versiontag, {'allowEmptyOutput': 1})
 endfunction
 
 " Function: s:bzrFunctions.Status(argList) {{{2

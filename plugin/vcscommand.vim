@@ -346,9 +346,6 @@ silent do VCSCommand User VCSPluginInit
 
 " Section: Constants declaration {{{1
 
-let g:VCSCOMMAND_IDENTIFY_EXACT = 1
-let g:VCSCOMMAND_IDENTIFY_INEXACT = -1
-
 " Section: Script variable initialization {{{1
 
 " Hidden functions for use by extensions
@@ -570,7 +567,7 @@ endfunction
 
 " Function:  s:IdentifyVCSType() {{{2
 " This function implements the non-cached identification strategy for
-" VcsCommandGetVCSType().
+" VCSCommandGetVCSType().
 "
 " Returns:  VCS type name identified for the given buffer; an exception is
 " thrown in case no type can be identified.
@@ -585,45 +582,46 @@ function!  s:IdentifyVCSType(buffer)
 		endfor
 	endif
 	let matches = []
-	let exactMatch = ''
-	let exactMatchCount = 0
+	let bestLevel = 99999
 	for vcsType in keys(s:plugins)
-		let identified = s:plugins[vcsType][1].Identify(a:buffer)
-		if identified
-			if identified == g:VCSCOMMAND_IDENTIFY_EXACT
-				let exactMatch = vcsType
-				let exactMatchCount += 1
-			endif
-			call add(matches, [vcsType, identified])
+		let level = s:plugins[vcsType][1].Identify(a:buffer)
+		if level > 0
+			let matches += [ [ vcsType, level ] ]
+			let bestLevel = min( [bestLevel, level] )
 		endif
 	endfor
+
 	if len(matches) == 1
 		return matches[0][0]
 	elseif len(matches) == 0
 		throw 'No suitable plugin'
-	else
-		let preferences = VCSCommandGetOption("VCSCommandVCSTypePreference", [])
-		if len(preferences) > 0
-			if type(preferences) == 1
-				let listPreferences = split(preferences, '\W\+')
-				unlet preferences
-				let preferences = listPreferences
-			endif
-			for preferred in preferences
-				for [vcsType, identified] in matches
-					if vcsType ==? preferred
-						return vcsType
-					endif
-				endfor
-			endfor
-		endif
-
-		if exactMatchCount == 1
-			return exactMatch
-		endif
-
-		throw 'can''t identify VCS type for current buffer due to too many matching VCS:  ' . join(map(matches, 'v:val[0]'))
 	endif
+
+	let preferences = VCSCommandGetOption("VCSCommandVCSTypePreference", [])
+	if type(preferences) == 1 " Change the variable from string to list
+		let listPreferences = split(preferences, '\W\+')
+		unlet preferences
+		let preferences = listPreferences
+	endif
+
+	if len(preferences) != 0
+		" Try to find match between preferences and detected VCS
+		for preferred in preferences
+			for [ vcsType, level ] in matches
+				if vcsType ==? preferred
+					return vcsType
+				endif
+			endfor
+		endfor
+	endif
+
+	for [ vcsType, level ] in matches
+		if level == bestLevel
+			return vcsType
+		endif
+	endfor
+
+	throw 'IdentifyVCSType: internal error; matches:'.join(matches, ' ')
 endfunction
 
 " Function: s:SetupScratchBuffer(command, vcsType, originalBuffer, statusText) {{{2
@@ -864,6 +862,10 @@ function! s:VCSCommit(bang, message)
 		endif
 
 		let originalBuffer = VCSCommandGetOriginalBuffer(bufnr('%'))
+
+		if getbufvar(originalBuffer, '&modified') == 1
+			throw 'You have unsaved modifications, commit aborted'
+		endif
 
 		" Handle the commit message being specified.  If a message is supplied, it
 		" is used; if bang is supplied, an empty message is used; otherwise, the
@@ -1162,6 +1164,24 @@ function! VCSCommandChangeToCurrentFileDir(fileName)
 	return oldCwd
 endfunction
 
+" Function: VCSCommandIdentifyFromRoot() {{{2
+" Run command in buffer's directory, return output as root directory.
+
+function! VCSCommandIdentifyFromRoot(buffer, command)
+	let oldCwd = VCSCommandChangeToCurrentFileDir(resolve(bufname(a:buffer)))
+	try
+		let root = s:VCSCommandUtility.system(a:command)
+		if(v:shell_error)
+			return 0
+		else
+			let root = substitute(root, '\n$', '', '')
+			return 1 + len(getcwd()) - len(root)
+		endif
+	finally
+		call VCSCommandChdir(oldCwd)
+	endtry
+endfunction
+
 " Function: VCSCommandGetOriginalBuffer(vcsBuffer) {{{2
 " Attempts to locate the original file to which VCS operations were applied
 " for a given buffer.
@@ -1216,6 +1236,11 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 		let allowNonZeroExit = a:options.allowNonZeroExit
 	endif
 
+	let allowEmptyOutput = 0
+	if has_key(a:options, 'allowEmptyOutput')
+		let allowEmptyOutput = a:options.allowEmptyOutput
+	endif
+
 	let originalBuffer = VCSCommandGetOriginalBuffer(bufnr('%'))
 	if originalBuffer == -1
 		throw 'Original buffer no longer exists, aborting.'
@@ -1230,6 +1255,9 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 		let fileName = '.'
 	else
 		let fileName = fnamemodify(path, ':t')
+	endif
+	if has_key(a:options, 'fileName')
+		let fileName = a:options.fileName
 	endif
 
 	if match(a:cmd, '<VCSCOMMANDFILE>') > 0
@@ -1261,7 +1289,7 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 		endif
 	endif
 
-	if strlen(output) == 0
+	if strlen(output) == 0 && !allowEmptyOutput
 		" Handle case of no output.  In this case, it is important to check the
 		" file status, especially since cvs edit/unedit may change the attributes
 		" of the file with no visible output.
