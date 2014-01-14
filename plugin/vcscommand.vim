@@ -1256,6 +1256,9 @@ function! VCSCommandDoCommand(cmd, cmdName, statusText, options)
 	else
 		let fileName = fnamemodify(path, ':t')
 	endif
+	if has_key(a:options, 'fileName')
+		let fileName = a:options.fileName
+	endif
 
 	if match(a:cmd, '<VCSCOMMANDFILE>') > 0
 		let fullCmd = substitute(a:cmd, '<VCSCOMMANDFILE>', fileName, 'g')
