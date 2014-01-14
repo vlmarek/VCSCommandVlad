@@ -863,6 +863,10 @@ function! s:VCSCommit(bang, message)
 
 		let originalBuffer = VCSCommandGetOriginalBuffer(bufnr('%'))
 
+		if getbufvar(originalBuffer, '&modified') == 1
+			throw 'You have unsaved modifications, commit aborted'
+		endif
+
 		" Handle the commit message being specified.  If a message is supplied, it
 		" is used; if bang is supplied, an empty message is used; otherwise, the
 		" user is provided a buffer from which to edit the commit message.
