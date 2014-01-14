@@ -222,7 +222,7 @@ function! s:bzrFunctions.Review(argList)
     let versionOption = ' -r ' . versiontag . ' '
   endif
 
-  return s:DoCommand('cat' . versionOption, 'review', versiontag, {})
+  return s:DoCommand('cat' . versionOption, 'review', versiontag, {'allowEmptyOutput': 1})
 endfunction
 
 " Function: s:bzrFunctions.Status(argList) {{{2

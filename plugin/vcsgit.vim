@@ -217,7 +217,7 @@ function! s:gitFunctions.Review(argList)
 
 	let prefix = substitute(prefix, '\n$', '', '')
 	let blob = '"' . revision . ':' . prefix . '<VCSCOMMANDFILE>"'
-	return s:DoCommand('show ' . blob, 'review', revision, {})
+	return s:DoCommand('show ' . blob, 'review', revision, {'allowEmptyOutput': 1})
 endfunction
 
 " Function: s:gitFunctions.Status(argList) {{{2
